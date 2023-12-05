@@ -54,13 +54,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Extensions\StringExtensions.cs" />
-    <Compile Include="Models\Domains\Error.cs" />
-    <Compile Include="Models\Domains\Report.cs" />
-    <Compile Include="Models\Domains\ReportPosition.cs" />
-    <Compile Include="Models\Email.cs" />
-    <Compile Include="Models\EmailParams.cs" />
-    <Compile Include="Models\GenerateHtmlEmail.cs" />
     <Compile Include="ProjectInstaller.cs">
       <SubType>Component</SubType>
     </Compile>
@@ -75,8 +68,6 @@
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Repositories\ErrorRepository.cs" />
-    <Compile Include="Repositories\ReportRepository.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
@@ -92,6 +83,20 @@
     <EmbeddedResource Include="ProjectInstaller.resx">
       <DependentUpon>ProjectInstaller.cs</DependentUpon>
     </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Cipher\Cipher.csproj">
+      <Project>{DE1635E4-F687-43F5-B24A-A69E02B2959A}</Project>
+      <Name>Cipher</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\EmailSender\EmailSender.csproj">
+      <Project>{a4dc1f8e-2bf0-4b42-8c8e-c229dac3328d}</Project>
+      <Name>EmailSender</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\ReportService.Core\ReportService.Core.csproj">
+      <Project>{B631B859-5CC9-48EC-909E-EFE84840C003}</Project>
+      <Name>ReportService.Core</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

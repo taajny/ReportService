@@ -1,8 +1,11 @@
-﻿using ReportService.Models;
-using ReportService.Repositories;
+﻿using Cipher;
+using EmailSender;
+using ReportService.Core;
+using ReportService.Core.Repositories;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Configuration;
 using System.Data;
 using System.Diagnostics;
 using System.Linq;
@@ -16,36 +19,68 @@ namespace ReportService
     public partial class ReportService : ServiceBase
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
-        private const int SendHour = 8;
-        private const int IntervalInMinutes = 30;
-        private Timer _timer = new Timer( IntervalInMinutes * 60000);
+        private int _sendHour;
+        private int _intervalInMinutes;
+        private bool _sendingRaports;
+        private Timer _timer;
         private ErrorRepository _errorRepository = new ErrorRepository();
         private ReportRepository _reportRepository = new ReportRepository();
         private Email _email;
         private GenerateHtmlEmail _htmlEmail = new GenerateHtmlEmail();
-        private string _emailReciver = "taajny@gmail.com";
+        private string _emailReciver;
+        private StringCipher _stringCipher = new StringCipher("FB8A78B8-5501-49E1-A437-FC21535ADAD2");
 
         public ReportService()
         {
             InitializeComponent();
 
-            _email = new Email(new EmailParams
+            try
             {
-                HostSmtp = "smtp.gmail.com",
-                Port = 587,
-                EnableSsl = true,
-                SenderName = "Krzysztof Stępczyński",
-                SenderEmail = "testowanieaplikacji339@gmail.com",
-                SenderEmailPassword = "czpk kxpg ojib ufok",
-            });
+                _emailReciver = ConfigurationManager.AppSettings["ReceiverEmail"];
+                _sendHour = Convert.ToInt32(ConfigurationManager.AppSettings["SendHour"]);
+                _intervalInMinutes = Convert.ToInt32(ConfigurationManager.AppSettings["IntervalInMinutes"]);
+                _timer = new Timer(_intervalInMinutes * 60000);
+                _sendingRaports = Convert.ToBoolean(ConfigurationManager.AppSettings["SendingRaports"]);
+
+                _email = new Email(new EmailParams
+                {
+                    HostSmtp = ConfigurationManager.AppSettings["HostSmtp"],
+                    Port = Convert.ToInt32(ConfigurationManager.AppSettings["Port"]),
+                    EnableSsl = Convert.ToBoolean(ConfigurationManager.AppSettings["EnableSsl"]),
+                    SenderName = ConfigurationManager.AppSettings["SenderName"],
+                    SenderEmail = ConfigurationManager.AppSettings["SenderEmail"],
+                    SenderEmailPassword = DecryptEmailSenderPasswor()
+                }); 
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, ex.Message);
+                throw new Exception(ex.Message);
+            }
         }
 
+        private string DecryptEmailSenderPasswor()
+        {
+            var encryptedPassword = ConfigurationManager.AppSettings["SenderEmailPassword"];
+
+            if (encryptedPassword.StartsWith("encrypt:"))
+            {
+                encryptedPassword = _stringCipher.Encrypt(encryptedPassword.Replace("encrypt:", ""));
+
+                var configFile = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+                configFile.AppSettings.Settings["SenderEmailPassword"].Value = encryptedPassword;
+                configFile.Save();
+            }
+
+            return _stringCipher.Decrypt(encryptedPassword);
+
+        }
         protected override void OnStart(string[] args)
         {
             _timer.Elapsed += DoWork;
             _timer.Start();
             Logger.Info("Service started ...");
-        }
+        } 
         protected override void OnStop()
         {
             Logger.Info("Service stopped ...");
@@ -55,8 +90,10 @@ namespace ReportService
             try
             {
                 await SendError();
-                await SendReport();
-
+                if(_sendingRaports)
+                {
+                    await SendReport();
+                }
             }
             catch (Exception ex)
             {
@@ -67,14 +104,14 @@ namespace ReportService
 
         private async Task SendError()
         {
-            var errors = _errorRepository.GetErrors(IntervalInMinutes);        
+            var errors = _errorRepository.GetErrors(_intervalInMinutes);        
 
             if( errors == null || !errors.Any() ) 
             {
                 return;
             }
 
-            await _email.Send("Błędy w aplikacji", _htmlEmail.GenerateErrors(errors, IntervalInMinutes), _emailReciver);
+            await _email.Send("Błędy w aplikacji", _htmlEmail.GenerateErrors(errors, _intervalInMinutes), _emailReciver);
              
             Logger.Info("Error sent.");
         }
@@ -83,7 +120,7 @@ namespace ReportService
         {
             var actualHour = DateTime.Now.Hour;
 
-            if( actualHour < SendHour ) 
+            if( actualHour < _sendHour ) 
             {
                 return;
             }
